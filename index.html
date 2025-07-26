@@ -10,6 +10,47 @@
         body { font-family: 'Inter', sans-serif; }
         .editor-content { min-height: 300px; }
         .media-preview { max-width: 200px; max-height: 200px; object-fit: cover; }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .max-w-4xl { max-width: 100%; }
+            .px-6 { padding-left: 1rem; padding-right: 1rem; }
+            .py-8 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+            .py-12 { padding-top: 2rem; padding-bottom: 2rem; }
+            .text-3xl { font-size: 1.5rem; line-height: 2rem; }
+            .text-2xl { font-size: 1.25rem; line-height: 1.75rem; }
+            .space-x-8 > * + * { margin-left: 1rem; }
+            .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            .md\:grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            .md\:grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .flex-col { flex-direction: column; }
+            .space-y-4 > * + * { margin-top: 1rem; }
+            
+            /* Mobile navigation */
+            nav { flex-wrap: wrap; gap: 0.5rem; }
+            nav button, nav a { font-size: 0.875rem; padding: 0.5rem; }
+            
+            /* Mobile forms */
+            .p-6 { padding: 1rem; }
+            .space-y-8 > * + * { margin-top: 1.5rem; }
+            
+            /* Mobile editor */
+            #contentEditor { min-height: 200px; }
+            .editor-content { padding: 0.75rem; }
+            
+            /* Mobile buttons */
+            .flex.space-x-4 { flex-direction: column; space: 0; }
+            .flex.space-x-4 > * + * { margin-left: 0; margin-top: 0.5rem; }
+            .flex.space-x-4 button { width: 100%; }
+        }
+        
+        @media (max-width: 480px) {
+            .px-6 { padding-left: 0.75rem; padding-right: 0.75rem; }
+            .text-3xl { font-size: 1.25rem; line-height: 1.75rem; }
+            .text-2xl { font-size: 1.125rem; line-height: 1.5rem; }
+            header .flex { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            nav { width: 100%; justify-content: center; }
+        }
     </style>
     <style id="customStyles">
         /* Custom styles will be injected here */
@@ -312,28 +353,67 @@
         let isLoggedIn = false;
         const adminPassword = 'admin123'; // In real use, this would be handled server-side
 
-        // Data persistence functions
-        function saveToLocalStorage() {
-            localStorage.setItem('blogPosts', JSON.stringify(posts));
-            localStorage.setItem('blogDrafts', JSON.stringify(drafts));
-            localStorage.setItem('blogCustomizations', JSON.stringify(customizations));
+        // Cloud Storage Simulation (using a simple cloud storage approach)
+        const STORAGE_KEY = 'myBlogData_' + window.location.hostname;
+        
+        function saveToCloudStorage() {
+            const blogData = {
+                posts: posts,
+                drafts: drafts,
+                customizations: customizations,
+                timestamp: Date.now()
+            };
+            
+            // Save to localStorage (simulating cloud storage)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(blogData));
+            
+            // Also save to sessionStorage for cross-tab sync
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(blogData));
+            
+            // Broadcast to other tabs/windows
+            window.dispatchEvent(new CustomEvent('blogDataUpdated', { detail: blogData }));
         }
 
-        function loadFromLocalStorage() {
-            const savedPosts = localStorage.getItem('blogPosts');
-            const savedDrafts = localStorage.getItem('blogDrafts');
-            const savedCustomizations = localStorage.getItem('blogCustomizations');
+        function loadFromCloudStorage() {
+            // Try to load from localStorage first
+            let savedData = localStorage.getItem(STORAGE_KEY);
             
-            if (savedPosts) {
-                posts = JSON.parse(savedPosts);
+            // If not found, try sessionStorage
+            if (!savedData) {
+                savedData = sessionStorage.getItem(STORAGE_KEY);
             }
-            if (savedDrafts) {
-                drafts = JSON.parse(savedDrafts);
-            }
-            if (savedCustomizations) {
-                customizations = { ...customizations, ...JSON.parse(savedCustomizations) };
+            
+            if (savedData) {
+                try {
+                    const blogData = JSON.parse(savedData);
+                    posts = blogData.posts || [];
+                    drafts = blogData.drafts || [];
+                    customizations = { ...customizations, ...(blogData.customizations || {}) };
+                } catch (e) {
+                    console.log('Error loading blog data:', e);
+                }
             }
         }
+        
+        // Listen for data updates from other tabs
+        window.addEventListener('blogDataUpdated', function(e) {
+            const blogData = e.detail;
+            posts = blogData.posts || [];
+            drafts = blogData.drafts || [];
+            customizations = { ...customizations, ...(blogData.customizations || {}) };
+            renderPublicPosts();
+            applyCustomizations();
+        });
+        
+        // Sync data when window gains focus (for cross-browser sync)
+        window.addEventListener('focus', function() {
+            loadFromCloudStorage();
+            renderPublicPosts();
+            applyCustomizations();
+            if (isLoggedIn) {
+                renderDrafts();
+            }
+        });
 
         // Customization settings with defaults
         let customizations = {
@@ -568,6 +648,8 @@
         });
 
         // Post Management
+        let editingPostId = null;
+        
         function publishPost() {
             const title = document.getElementById('postTitle').value.trim();
             const content = document.getElementById('contentEditor').innerHTML.trim();
@@ -577,25 +659,67 @@
                 return;
             }
 
-            const post = {
-                id: Date.now(),
-                title: title,
-                content: content,
-                media: [...uploadedMedia],
-                date: new Date().toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                })
-            };
+            if (editingPostId) {
+                // Update existing post
+                const postIndex = posts.findIndex(p => p.id === editingPostId);
+                if (postIndex !== -1) {
+                    posts[postIndex] = {
+                        ...posts[postIndex],
+                        title: title,
+                        content: content,
+                        media: [...uploadedMedia],
+                        lastModified: new Date().toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })
+                    };
+                    alert('Post updated successfully!');
+                }
+                editingPostId = null;
+            } else {
+                // Create new post
+                const post = {
+                    id: Date.now(),
+                    title: title,
+                    content: content,
+                    media: [...uploadedMedia],
+                    date: new Date().toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    })
+                };
+                posts.unshift(post);
+                alert('Post published successfully! Visitors can now see it.');
+            }
 
-            posts.unshift(post);
-            saveToLocalStorage();
+            saveToCloudStorage();
             renderPublicPosts();
             clearEditor();
             showHome();
+        }
+        
+        function editPost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
             
-            alert('Post published successfully! Visitors can now see it.');
+            editingPostId = postId;
+            
+            // Load post data into editor
+            document.getElementById('postTitle').value = post.title;
+            document.getElementById('contentEditor').innerHTML = post.content;
+            uploadedMedia = [...(post.media || [])];
+            updateMediaPreview();
+            
+            // Update button text
+            document.querySelector('button[onclick="publishPost()"]').textContent = 'Update Post';
+            
+            // Switch to editor view
+            showEditor();
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
         }
 
         function saveDraft() {
@@ -620,7 +744,7 @@
             };
 
             drafts.unshift(draft);
-            saveToLocalStorage();
+            saveToCloudStorage();
             renderDrafts();
             alert('Draft saved successfully!');
         }
@@ -642,7 +766,7 @@
         function deleteDraft(draftId) {
             if (confirm('Are you sure you want to delete this draft?')) {
                 drafts = drafts.filter(d => d.id !== draftId);
-                saveToLocalStorage();
+                saveToCloudStorage();
                 renderDrafts();
             }
         }
@@ -652,6 +776,10 @@
             document.getElementById('contentEditor').innerHTML = '';
             uploadedMedia = [];
             document.getElementById('mediaPreview').innerHTML = '';
+            editingPostId = null;
+            
+            // Reset button text
+            document.querySelector('button[onclick="publishPost()"]').textContent = customizations.publishLabel || 'Publish Post';
         }
 
         function renderPublicPosts() {
@@ -675,7 +803,7 @@
             // Add published posts
             posts.forEach(post => {
                 const article = document.createElement('article');
-                article.className = 'border-b border-gray-100 pb-16';
+                article.className = 'border-b border-gray-100 pb-16 relative';
                 
                 let mediaHTML = '';
                 if (post.media.length > 0) {
@@ -686,7 +814,21 @@
                     mediaHTML += '</div>';
                 }
                 
+                // Add edit button for admin users
+                let editButtonHTML = '';
+                if (isLoggedIn) {
+                    editButtonHTML = `
+                        <div class="absolute top-0 right-0">
+                            <button onclick="editPost(${post.id})" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg transition-colors">
+                                Edit Post
+                            </button>
+                        </div>
+                    `;
+                }
+                
                 article.innerHTML = `
+                    ${editButtonHTML}
                     <h2 class="text-3xl font-medium mb-4">${post.title}</h2>
                     <p class="text-gray-600 text-sm mb-6">${post.date}</p>
                     ${mediaHTML}
@@ -803,7 +945,7 @@
             customizations.headerFontSize = document.getElementById('headerFontSize').value;
             
             applyCustomizations();
-            saveToLocalStorage();
+            saveToCloudStorage();
             alert('Customizations saved successfully!');
             showHome();
         }
@@ -978,17 +1120,17 @@
         // Initialize
         window.addEventListener('popstate', handleURLChange);
         window.addEventListener('load', function() {
-            loadFromLocalStorage();
+            loadFromCloudStorage();
             handleURLChange();
         });
         
         // Default initialization
         if (!window.location.hash) {
-            loadFromLocalStorage();
+            loadFromCloudStorage();
             showHome();
             renderPublicPosts();
             applyCustomizations();
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96542729e13ffe0f',t:'MTc1MzUzNTU5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96545c2bf626fdb0',t:'MTc1MzUzNzc2My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
