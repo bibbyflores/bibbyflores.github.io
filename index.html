@@ -1,12 +1,502 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bibby Practice Code Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Blog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .editor-content { min-height: 300px; }
+        .media-preview { max-width: 200px; max-height: 200px; object-fit: cover; }
+    </style>
 </head>
-<body>
-  <h1>Welcome to Bibby Practice Code Page 🌍</h1>
-  <p>This is your first custom web page hosted on GitHub Pages!</p>
-</body>
+<body class="bg-white text-gray-900">
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg max-w-md w-full mx-4">
+            <h2 class="text-2xl font-medium mb-6">Admin Login</h2>
+            <div class="space-y-4">
+                <input type="password" id="adminPassword" placeholder="Enter admin password" 
+                       class="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-gray-500">
+                <button onclick="login()" 
+                        class="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 transition-colors">
+                    Login
+                </button>
+                <button onclick="closeLogin()" 
+                        class="w-full text-gray-500 hover:text-gray-700 transition-colors">
+                    Cancel
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-4">Demo password: admin123</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-6 py-8">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-medium">My Blog</h1>
+                <nav class="flex space-x-8" id="publicNav">
+                    <button onclick="showHome()" class="text-gray-900 hover:text-gray-900 transition-colors" id="homeBtn">Home</button>
+                    <a href="#admin" onclick="goToAdmin()" class="text-gray-600 hover:text-gray-900 transition-colors">Admin</a>
+                </nav>
+                <nav class="flex space-x-8 hidden" id="adminNav">
+                    <a href="#" onclick="goToPublic()" class="text-gray-600 hover:text-gray-900 transition-colors">View Blog</a>
+                    <button onclick="showEditor()" class="text-gray-900 hover:text-gray-900 transition-colors" id="editorBtn">Write</button>
+                    <button onclick="logout()" class="text-gray-600 hover:text-gray-900 transition-colors" id="logoutBtn">Logout</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Public Home View -->
+    <main id="homeView" class="max-w-4xl mx-auto px-6 py-12">
+        <div id="postsContainer" class="space-y-16">
+            <!-- Sample published post -->
+            <article class="border-b border-gray-100 pb-16">
+                <h2 class="text-3xl font-medium mb-4">Welcome to My Blog</h2>
+                <p class="text-gray-600 text-sm mb-6">March 15, 2024</p>
+                <div class="prose max-w-none">
+                    <p class="text-gray-700 leading-relaxed mb-4">
+                        Welcome to my personal blog! This is where I share my thoughts, experiences, and insights on various topics.
+                    </p>
+                    <p class="text-gray-700 leading-relaxed">
+                        Stay tuned for more posts coming soon. Each post is carefully crafted to provide value and spark meaningful conversations.
+                    </p>
+                </div>
+            </article>
+        </div>
+        
+        <!-- Empty state for no posts -->
+        <div id="emptyState" class="text-center py-20 hidden">
+            <p class="text-gray-500 text-lg">No posts published yet.</p>
+            <p class="text-gray-400 text-sm mt-2">Check back soon for new content!</p>
+        </div>
+    </main>
+
+    <!-- Admin Editor View (Hidden by default) -->
+    <div id="editorView" class="max-w-4xl mx-auto px-6 py-12 hidden">
+        <div class="mb-8">
+            <h2 class="text-2xl font-medium mb-8">Write New Post</h2>
+            
+            <!-- Post Title -->
+            <div class="mb-6">
+                <input type="text" id="postTitle" placeholder="Post title..." 
+                       class="w-full text-3xl font-medium border-none outline-none placeholder-gray-400">
+            </div>
+
+            <!-- Media Upload Section -->
+            <div class="mb-8 p-6 border border-gray-200 rounded-lg">
+                <h3 class="text-lg font-medium mb-4">Add Photos</h3>
+                <div class="mb-4">
+                    <label class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg cursor-pointer transition-colors">
+                        <span class="text-sm">Upload Photos</span>
+                        <input type="file" id="imageUpload" accept="image/*" multiple class="hidden">
+                    </label>
+                </div>
+                <div id="mediaPreview" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+            </div>
+
+            <!-- Content Editor -->
+            <div class="mb-8">
+                <div id="contentEditor" contenteditable="true" 
+                     class="editor-content w-full p-4 border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-colors"
+                     placeholder="Start writing your post...">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex space-x-4">
+                <button onclick="publishPost()" 
+                        class="bg-gray-900 text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors">
+                    Publish Post
+                </button>
+                <button onclick="saveDraft()" 
+                        class="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+                    Save Draft
+                </button>
+                <button onclick="clearEditor()" 
+                        class="text-gray-500 hover:text-gray-700 px-6 py-2 transition-colors">
+                    Clear
+                </button>
+            </div>
+
+            <!-- Drafts Section -->
+            <div id="draftsSection" class="mt-12 pt-8 border-t border-gray-200">
+                <h3 class="text-lg font-medium mb-4">Your Drafts</h3>
+                <div id="draftsContainer" class="space-y-4">
+                    <!-- Drafts will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-200 mt-20">
+        <div class="max-w-4xl mx-auto px-6 py-8">
+            <p class="text-gray-500 text-sm text-center">© 2024 My Blog. Simple and secure.</p>
+        </div>
+    </footer>
+
+    <script>
+        let posts = [];
+        let drafts = [];
+        let uploadedMedia = [];
+        let isLoggedIn = false;
+        const adminPassword = 'admin123'; // In real use, this would be handled server-side
+
+        // URL Routing
+        function updateURL(path) {
+            window.history.pushState({}, '', path);
+        }
+
+        function handleURLChange() {
+            const path = window.location.hash || window.location.pathname;
+            
+            if (path.includes('admin')) {
+                if (!isLoggedIn) {
+                    showLogin();
+                } else {
+                    showAdminInterface();
+                    showEditor();
+                }
+            } else {
+                showPublicInterface();
+                showHome();
+            }
+        }
+
+        function goToAdmin() {
+            updateURL('#admin');
+            if (!isLoggedIn) {
+                showLogin();
+            } else {
+                showAdminInterface();
+                showEditor();
+            }
+        }
+
+        function goToPublic() {
+            updateURL('#');
+            showPublicInterface();
+            showHome();
+        }
+
+        // Authentication
+        function showLogin() {
+            document.getElementById('loginModal').classList.remove('hidden');
+        }
+
+        function closeLogin() {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function login() {
+            const password = document.getElementById('adminPassword').value;
+            if (password === adminPassword) {
+                isLoggedIn = true;
+                closeLogin();
+                updateURL('#admin');
+                showAdminInterface();
+                showEditor();
+                alert('Welcome back! You can now create and manage posts.');
+            } else {
+                alert('Incorrect password. Please try again.');
+            }
+        }
+
+        function logout() {
+            isLoggedIn = false;
+            updateURL('#');
+            showPublicInterface();
+            showHome();
+            alert('Logged out successfully.');
+        }
+
+        function showAdminInterface() {
+            document.getElementById('publicNav').classList.add('hidden');
+            document.getElementById('adminNav').classList.remove('hidden');
+        }
+
+        function showPublicInterface() {
+            document.getElementById('publicNav').classList.remove('hidden');
+            document.getElementById('adminNav').classList.add('hidden');
+        }
+
+        // Navigation
+        function showHome() {
+            document.getElementById('homeView').classList.remove('hidden');
+            document.getElementById('editorView').classList.add('hidden');
+            updateNavigation('home');
+        }
+
+        function showEditor() {
+            if (!isLoggedIn) {
+                showLogin();
+                return;
+            }
+            document.getElementById('homeView').classList.add('hidden');
+            document.getElementById('editorView').classList.remove('hidden');
+            updateNavigation('editor');
+            renderDrafts();
+        }
+
+        function updateNavigation(active) {
+            // Reset all buttons
+            document.getElementById('homeBtn').classList.remove('text-gray-900');
+            document.getElementById('homeBtn').classList.add('text-gray-600');
+            if (document.getElementById('editorBtn').classList.contains('hidden') === false) {
+                document.getElementById('editorBtn').classList.remove('text-gray-900');
+                document.getElementById('editorBtn').classList.add('text-gray-600');
+            }
+
+            // Highlight active button
+            if (active === 'home') {
+                document.getElementById('homeBtn').classList.add('text-gray-900');
+                document.getElementById('homeBtn').classList.remove('text-gray-600');
+            } else if (active === 'editor') {
+                document.getElementById('editorBtn').classList.add('text-gray-900');
+                document.getElementById('editorBtn').classList.remove('text-gray-600');
+            }
+        }
+
+        // Media Upload Handling
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+            handleMediaUpload(e.target.files);
+        });
+
+        function handleMediaUpload(files) {
+            const preview = document.getElementById('mediaPreview');
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const mediaData = {
+                        src: e.target.result,
+                        name: file.name
+                    };
+                    uploadedMedia.push(mediaData);
+                    
+                    const mediaElement = document.createElement('div');
+                    mediaElement.className = 'relative group';
+                    mediaElement.innerHTML = `
+                        <img src="${e.target.result}" class="media-preview rounded-lg" alt="${file.name}">
+                        <button onclick="removeMedia(${uploadedMedia.length - 1})" 
+                                class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                    `;
+                    
+                    preview.appendChild(mediaElement);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeMedia(index) {
+            uploadedMedia.splice(index, 1);
+            updateMediaPreview();
+        }
+
+        function updateMediaPreview() {
+            const preview = document.getElementById('mediaPreview');
+            preview.innerHTML = '';
+            
+            uploadedMedia.forEach((media, index) => {
+                const mediaElement = document.createElement('div');
+                mediaElement.className = 'relative group';
+                mediaElement.innerHTML = `
+                    <img src="${media.src}" class="media-preview rounded-lg" alt="${media.name}">
+                    <button onclick="removeMedia(${index})" 
+                            class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                `;
+                preview.appendChild(mediaElement);
+            });
+        }
+
+        // Editor placeholder handling
+        const editor = document.getElementById('contentEditor');
+        editor.addEventListener('focus', function() {
+            if (this.innerHTML === '') {
+                this.innerHTML = '';
+            }
+        });
+
+        // Post Management
+        function publishPost() {
+            const title = document.getElementById('postTitle').value.trim();
+            const content = document.getElementById('contentEditor').innerHTML.trim();
+            
+            if (!title || !content) {
+                alert('Please add a title and content for your post.');
+                return;
+            }
+
+            const post = {
+                id: Date.now(),
+                title: title,
+                content: content,
+                media: [...uploadedMedia],
+                date: new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                })
+            };
+
+            posts.unshift(post);
+            renderPublicPosts();
+            clearEditor();
+            showHome();
+            
+            alert('Post published successfully! Visitors can now see it.');
+        }
+
+        function saveDraft() {
+            const title = document.getElementById('postTitle').value.trim();
+            const content = document.getElementById('contentEditor').innerHTML.trim();
+            
+            if (!title && !content) {
+                alert('Nothing to save.');
+                return;
+            }
+
+            const draft = {
+                id: Date.now(),
+                title: title || 'Untitled Draft',
+                content: content,
+                media: [...uploadedMedia],
+                date: new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                })
+            };
+
+            drafts.unshift(draft);
+            renderDrafts();
+            alert('Draft saved successfully!');
+        }
+
+        function loadDraft(draftId) {
+            const draft = drafts.find(d => d.id === draftId);
+            if (draft) {
+                document.getElementById('postTitle').value = draft.title;
+                document.getElementById('contentEditor').innerHTML = draft.content;
+                uploadedMedia = [...draft.media];
+                updateMediaPreview();
+                
+                // Remove draft from drafts array
+                drafts = drafts.filter(d => d.id !== draftId);
+                renderDrafts();
+            }
+        }
+
+        function deleteDraft(draftId) {
+            if (confirm('Are you sure you want to delete this draft?')) {
+                drafts = drafts.filter(d => d.id !== draftId);
+                renderDrafts();
+            }
+        }
+
+        function clearEditor() {
+            document.getElementById('postTitle').value = '';
+            document.getElementById('contentEditor').innerHTML = '';
+            uploadedMedia = [];
+            document.getElementById('mediaPreview').innerHTML = '';
+        }
+
+        function renderPublicPosts() {
+            const container = document.getElementById('postsContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (posts.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            container.innerHTML = '';
+            
+            posts.forEach(post => {
+                const article = document.createElement('article');
+                article.className = 'border-b border-gray-100 pb-16';
+                
+                let mediaHTML = '';
+                if (post.media.length > 0) {
+                    mediaHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">';
+                    post.media.forEach(media => {
+                        mediaHTML += `<img src="${media.src}" class="rounded-lg w-full" alt="${media.name}">`;
+                    });
+                    mediaHTML += '</div>';
+                }
+                
+                article.innerHTML = `
+                    <h2 class="text-3xl font-medium mb-4">${post.title}</h2>
+                    <p class="text-gray-600 text-sm mb-6">${post.date}</p>
+                    ${mediaHTML}
+                    <div class="prose max-w-none">
+                        ${post.content}
+                    </div>
+                `;
+                
+                container.appendChild(article);
+            });
+        }
+
+        function renderDrafts() {
+            const container = document.getElementById('draftsContainer');
+            
+            if (drafts.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">No drafts saved.</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            drafts.forEach(draft => {
+                const draftElement = document.createElement('div');
+                draftElement.className = 'p-4 border border-gray-200 rounded-lg';
+                draftElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-medium">${draft.title}</h4>
+                            <p class="text-sm text-gray-500 mt-1">${draft.date}</p>
+                        </div>
+                        <div class="flex space-x-2 ml-4">
+                            <button onclick="loadDraft(${draft.id})" 
+                                    class="text-blue-600 hover:text-blue-700 text-sm">
+                                Edit
+                            </button>
+                            <button onclick="deleteDraft(${draft.id})" 
+                                    class="text-red-600 hover:text-red-700 text-sm">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(draftElement);
+            });
+        }
+
+        // Handle Enter key in password field
+        document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+
+        // Initialize
+        window.addEventListener('popstate', handleURLChange);
+        window.addEventListener('load', handleURLChange);
+        
+        // Default initialization
+        if (!window.location.hash) {
+            showHome();
+            renderPublicPosts();
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96502cb4c4a6f888',t:'MTc1MzQ5Mzg3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
